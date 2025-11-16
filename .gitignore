@@ -1,0 +1,33 @@
+# Arquivos compilados
+build/*
+!build/.gitkeep
+
+# Arquivos objeto
+*.o
+*.out
+
+# Executáveis
+servidor
+cliente
+cliente_grafico
+
+# PID files
+*.pid
+
+# Logs
+*.log
+
+# Editor configs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporários
+tmp/
+temp/
