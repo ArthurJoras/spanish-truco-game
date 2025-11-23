@@ -17,8 +17,8 @@ Um jogo de truco espanhol 1v1 implementado em C com arquitetura cliente-servidor
 - 🔌 **TCP Sockets**: Comunicação robusta com protocolo binário
 - 🎯 **Regras completas**: Truco, Envido, Flor, Retruco, Vale 4, Real Envido, Falta Envido
 - 🖥️ **Interface gráfica**: Cliente SDL2 com cartas visuais e botões interativos
-- 📟 **Interface terminal**: Cliente minimalista para testes
 - 🧵 **Multithreading**: Servidor com pthread para múltiplas conexões simultâneas
+- 🔄 **Reconexão automática**: Sistema de reconexão com backoff exponencial
 
 ## 📁 Estrutura do Projeto
 
@@ -26,7 +26,6 @@ Um jogo de truco espanhol 1v1 implementado em C com arquitetura cliente-servidor
 trabalho_truco/
 ├── src/              # Código fonte (.c)
 │   ├── servidor.c
-│   ├── cliente.c
 │   ├── cliente_grafico.c
 │   ├── ui_grafica.c
 │   ├── game_logic.c
@@ -38,8 +37,7 @@ trabalho_truco/
 ├── build/            # Executáveis compilados
 ├── assets/           # Imagens das cartas (PNG)
 │   └── img/
-├── docs/             # Documentação adicional
-├── scripts/          # Scripts auxiliares
+├── truco.sh          # Script auxiliar de execução
 ├── Makefile
 └── README.md
 ```
@@ -114,28 +112,27 @@ make run-server
 **Terminal 2 - Cliente 1:**
 
 ```bash
-make run-client-gui
+make run-client
 ```
 
 **Terminal 3 - Cliente 2:**
 
 ```bash
-make run-client-gui
+make run-client
 ```
 
 ## 🛠️ Comandos do Makefile
 
-| Comando               | Descrição                            |
-| --------------------- | ------------------------------------ |
-| `make` ou `make all`  | Compila tudo                         |
-| `make run-server`     | Inicia o servidor                    |
-| `make run-client`     | Inicia cliente terminal              |
-| `make run-client-gui` | Inicia cliente gráfico               |
-| `make demo`           | Inicia servidor em background        |
-| `make stop-server`    | Para servidor em background          |
-| `make clean`          | Remove arquivos compilados           |
-| `make install-deps`   | Instala dependências (Ubuntu/Debian) |
-| `make help`           | Mostra ajuda completa                |
+| Comando              | Descrição                            |
+| -------------------- | ------------------------------------ |
+| `make` ou `make all` | Compila tudo                         |
+| `make run-server`    | Inicia o servidor                    |
+| `make run-client`    | Inicia cliente gráfico               |
+| `make demo`          | Inicia servidor em background        |
+| `make stop-server`   | Para servidor em background          |
+| `make clean`         | Remove arquivos compilados           |
+| `make install-deps`  | Instala dependências (Ubuntu/Debian) |
+| `make help`          | Mostra ajuda completa                |
 
 ## 🎯 Como Jogar
 
@@ -161,24 +158,18 @@ make run-client-gui
    - **Retruco/Vale Quatro**: Aumenta a aposta após Truco
    - **Real Envido/Falta Envido**: Aumenta a aposta após Envido
 
-### Cliente Terminal
-
-Interface de texto com comandos numerados. Basta digitar o número da opção desejada.
-
 ## 🔧 Configuração Avançada
 
 ### Mudar Porta do Servidor
 
 ```bash
-cd build
-./servidor 9000
+./build/servidor 9000
 ```
 
 ### Conectar a Servidor Remoto
 
 ```bash
-cd build
-./cliente_grafico 192.168.1.100 9000
+./build/cliente_grafico 192.168.1.100 9000
 ```
 
 ## 📊 Arquitetura Técnica
@@ -229,23 +220,9 @@ Verifique se a porta 8888 está disponível:
 lsof -i :8888
 ```
 
-## 📚 Documentação Adicional
-
-Consulte a pasta `docs/` para documentação detalhada sobre:
-
-- Implementação das regras
-- Guia da interface gráfica
-- Checklist de funcionalidades
-
-## 🤝 Contribuindo
-
-Este projeto foi desenvolvido como trabalho acadêmico para a disciplina de Redes de Computadores.
-
-## 📝 Licença
-
-Projeto acadêmico - Universidade Federal do ABC (UFABC)
-
 ## 👥 Autores
+
+Arthur do Rosário Joras
 
 Desenvolvido como trabalho da disciplina de Redes de Computadores.
 

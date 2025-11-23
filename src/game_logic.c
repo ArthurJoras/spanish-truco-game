@@ -205,13 +205,9 @@ bool jogar_carta(Jogo* jogo, int jogador, int indice_carta) {
 	if (jogador == 1) {
 		rodada->carta_jogador1 = carta_jogada;
 		rodada->jogador1_jogou = true;
-		printf("DEBUG jogar_carta: J1 jogou carta (%d,%d) na rodada %d\n",
-		       carta_jogada.naipe, carta_jogada.numero, jogo->rodada_atual);
 	} else {
 		rodada->carta_jogador2 = carta_jogada;
 		rodada->jogador2_jogou = true;
-		printf("DEBUG jogar_carta: J2 jogou carta (%d,%d) na rodada %d\n",
-		       carta_jogada.naipe, carta_jogada.numero, jogo->rodada_atual);
 	}
 
 	// Se ambos jogaram, resolve a rodada
@@ -620,12 +616,6 @@ EstadoJogo obter_estado_jogo(Jogo* jogo, int jogador) {
 	bool oponente_cantou_envido = jogo->aguardando_resposta_envido && jogo->ultimo_a_aumentar_envido != jogador;
 	bool oponente_cantou_flor = jogo->aguardando_resposta_flor && jogo->jogador_cantou_flor != jogador;
 	estado.aguardando_resposta = oponente_cantou_truco || oponente_cantou_envido || oponente_cantou_flor;
-
-	if (jogo->aguardando_resposta_truco || jogo->aguardando_resposta_envido || jogo->aguardando_resposta_flor) {
-		printf("DEBUG obter_estado_jogo: J%d - aguardando_truco=%d (ultimo_aumentar=%d), aguardando_envido=%d (ultimo_aumentar=%d), resultado=%d\n",
-		       jogador, jogo->aguardando_resposta_truco, jogo->ultimo_a_aumentar_truco,
-		       jogo->aguardando_resposta_envido, jogo->ultimo_a_aumentar_envido, estado.aguardando_resposta);
-	}
 
 	return estado;
 }

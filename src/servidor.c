@@ -319,15 +319,11 @@ void processar_mensagem(Cliente* cliente, Mensagem* msg) {
 				resposta.sala_id = sala->id;
 
 				EstadoJogo estado1 = obter_estado_jogo(&sala->jogo, 1);
-				printf("DEBUG: Enviando para jogador 1 - vez_jogador=%d (vez_real=%d)\n",
-				       estado1.vez_jogador, sala->jogo.vez_jogador);
 				resposta.jogador_id = sala->jogador1_id;
 				memcpy(resposta.dados, &estado1, sizeof(EstadoJogo));
 				enviar_mensagem(sala->jogador1_socket, &resposta);
 
 				EstadoJogo estado2 = obter_estado_jogo(&sala->jogo, 2);
-				printf("DEBUG: Enviando para jogador 2 - vez_jogador=%d (vez_real=%d)\n",
-				       estado2.vez_jogador, sala->jogo.vez_jogador);
 				resposta.jogador_id = sala->jogador2_id;
 				memcpy(resposta.dados, &estado2, sizeof(EstadoJogo));
 				enviar_mensagem(sala->jogador2_socket, &resposta);
@@ -352,15 +348,11 @@ void processar_mensagem(Cliente* cliente, Mensagem* msg) {
 					resposta.sala_id = sala->id;
 
 					EstadoJogo estado1 = obter_estado_jogo(&sala->jogo, 1);
-					printf("DEBUG: Após jogar carta - J1: vez_jogador=%d (vez_real=%d)\n",
-					       estado1.vez_jogador, sala->jogo.vez_jogador);
 					resposta.jogador_id = sala->jogador1_id;
 					memcpy(resposta.dados, &estado1, sizeof(EstadoJogo));
 					enviar_mensagem(sala->jogador1_socket, &resposta);
 
 					EstadoJogo estado2 = obter_estado_jogo(&sala->jogo, 2);
-					printf("DEBUG: Após jogar carta - J2: vez_jogador=%d (vez_real=%d)\n",
-					       estado2.vez_jogador, sala->jogo.vez_jogador);
 					resposta.jogador_id = sala->jogador2_id;
 					memcpy(resposta.dados, &estado2, sizeof(EstadoJogo));
 					enviar_mensagem(sala->jogador2_socket, &resposta);
@@ -412,17 +404,14 @@ void processar_mensagem(Cliente* cliente, Mensagem* msg) {
 				pthread_mutex_lock(&sala->mutex);
 
 				int jogador = (cliente->socket == sala->jogador1_socket) ? 1 : 2;
-				printf("DEBUG: Jogador %d tentando cantar TRUCO\n", jogador);
 
 				if (cantar_truco(&sala->jogo, jogador)) {
-					printf("DEBUG: TRUCO aceito! Enviando notificacao MSG_TRUCO...\n");
 					// Primeiro envia notificação MSG_TRUCO
 					resposta.tipo = MSG_TRUCO;
 					resposta.sala_id = sala->id;
 					resposta.jogador_id = cliente->id;
 					broadcast_sala(sala, &resposta, -1);
 
-					printf("DEBUG: Enviando estado atualizado com aguardando_resposta=1\n");
 					// Depois envia estado atualizado (com aguardando_resposta=1)
 					resposta.tipo = MSG_ESTADO_JOGO;
 					resposta.sala_id = sala->id;
@@ -436,8 +425,6 @@ void processar_mensagem(Cliente* cliente, Mensagem* msg) {
 					resposta.jogador_id = sala->jogador2_id;
 					memcpy(resposta.dados, &estado2, sizeof(EstadoJogo));
 					enviar_mensagem(sala->jogador2_socket, &resposta);
-				} else {
-					printf("DEBUG: TRUCO rejeitado por cantar_truco()\n");
 				}
 
 				pthread_mutex_unlock(&sala->mutex);
@@ -493,17 +480,14 @@ void processar_mensagem(Cliente* cliente, Mensagem* msg) {
 				pthread_mutex_lock(&sala->mutex);
 
 				int jogador = (cliente->socket == sala->jogador1_socket) ? 1 : 2;
-				printf("DEBUG: Jogador %d tentando cantar ENVIDO\n", jogador);
 
 				if (cantar_envido(&sala->jogo, jogador)) {
-					printf("DEBUG: ENVIDO aceito! Enviando notificacao MSG_ENVIDO...\n");
 					// Primeiro envia notificação MSG_ENVIDO
 					resposta.tipo = MSG_ENVIDO;
 					resposta.sala_id = sala->id;
 					resposta.jogador_id = cliente->id;
 					broadcast_sala(sala, &resposta, -1);
 
-					printf("DEBUG: Enviando estado atualizado com aguardando_resposta=1\n");
 					// Depois envia estado atualizado (com aguardando_resposta=1)
 					resposta.tipo = MSG_ESTADO_JOGO;
 					resposta.sala_id = sala->id;
@@ -517,9 +501,6 @@ void processar_mensagem(Cliente* cliente, Mensagem* msg) {
 					resposta.jogador_id = sala->jogador2_id;
 					memcpy(resposta.dados, &estado2, sizeof(EstadoJogo));
 					enviar_mensagem(sala->jogador2_socket, &resposta);
-				} else {
-					printf("DEBUG: ENVIDO rejeitado - Rodada: %d, Envido_cantado: %d\n",
-					       sala->jogo.rodada_atual, sala->jogo.envido_cantado);
 				}
 
 				pthread_mutex_unlock(&sala->mutex);
@@ -631,18 +612,14 @@ void processar_mensagem(Cliente* cliente, Mensagem* msg) {
 				pthread_mutex_lock(&sala->mutex);
 
 				int jogador = (cliente->socket == sala->jogador1_socket) ? 1 : 2;
-				Jogador* j = (jogador == 1) ? &sala->jogo.jogador1 : &sala->jogo.jogador2;
-				printf("DEBUG: Jogador %d tentando cantar FLOR (tem_flor: %d)\n", jogador, j->tem_flor);
 
 				if (cantar_flor(&sala->jogo, jogador)) {
-					printf("DEBUG: FLOR aceita! Enviando notificacao MSG_FLOR...\n");
 					// Primeiro envia notificação MSG_FLOR
 					resposta.tipo = MSG_FLOR;
 					resposta.sala_id = sala->id;
 					resposta.jogador_id = cliente->id;
 					broadcast_sala(sala, &resposta, -1);
 
-					printf("DEBUG: Enviando estado atualizado com aguardando_resposta=1\n");
 					// Depois envia estado atualizado (com aguardando_resposta=1)
 					resposta.tipo = MSG_ESTADO_JOGO;
 					resposta.sala_id = sala->id;
@@ -656,9 +633,6 @@ void processar_mensagem(Cliente* cliente, Mensagem* msg) {
 					resposta.jogador_id = sala->jogador2_id;
 					memcpy(resposta.dados, &estado2, sizeof(EstadoJogo));
 					enviar_mensagem(sala->jogador2_socket, &resposta);
-				} else {
-					printf("DEBUG: FLOR rejeitada - Rodada: %d, Tem_flor: %d, Flor_cantada: %d\n",
-					       sala->jogo.rodada_atual, j->tem_flor, sala->jogo.flor_cantada);
 				}
 
 				pthread_mutex_unlock(&sala->mutex);
@@ -695,8 +669,6 @@ void* thread_cliente(void* arg) {
 		return NULL;
 	}
 
-	printf("Cliente %u conectado\n", cliente->id);
-
 	// Envia ID do cliente
 	Mensagem msg;
 	memset(&msg, 0, sizeof(Mensagem));
@@ -710,7 +682,6 @@ void* thread_cliente(void* arg) {
 	}
 
 	// Cliente desconectou
-	printf("Cliente %u desconectado\n", cliente->id);
 	remover_cliente_da_sala(cliente);
 
 	pthread_mutex_lock(&clientes_mutex);

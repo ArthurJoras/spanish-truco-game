@@ -291,12 +291,10 @@ Botao* ui_adicionar_botao(UIGrafica* ui, int x, int y, int w, int h,
 	botao->callback = callback;
 	botao->callback_data = data;
 
-	printf("Botão adicionado: '%s' em (%d,%d)\n", texto, x, y);
 	return botao;
 }
 
 void ui_limpar_botoes(UIGrafica* ui) {
-	printf("Limpando %d botões\n", ui->num_botoes);
 	ui->num_botoes = 0;
 }
 
@@ -588,7 +586,6 @@ void ui_processar_evento(UIGrafica* ui, UIEstado* estado, SDL_Event* evento) {
 				// IMPORTANTE: Processar botões PRIMEIRO (prioridade maior)
 				Botao* botao = ui_obter_botao_clicado(ui, evento->button.x, evento->button.y);
 				if (botao && botao->callback) {
-					printf("Botão '%s' clicado!\n", botao->texto);
 					botao->callback(botao->callback_data);
 					break;  // NÃO processar cartas se clicou em botão
 				}
@@ -598,12 +595,8 @@ void ui_processar_evento(UIGrafica* ui, UIEstado* estado, SDL_Event* evento) {
 					int mao_y = ALTURA_JANELA - ALTURA_CARTA - 50;
 					int mao_x = LARGURA_JANELA / 2 - (estado->estado_jogo.num_cartas_mao * (LARGURA_CARTA + ESPACAMENTO_CARTA)) / 2;
 
-					printf("Clique detectado em (%d,%d) - Checando %d cartas\n",
-					       evento->button.x, evento->button.y, estado->estado_jogo.num_cartas_mao);
-
 					for (int i = 0; i < estado->estado_jogo.num_cartas_mao; i++) {
 						int carta_x = mao_x + i * (LARGURA_CARTA + ESPACAMENTO_CARTA);
-						printf("  Carta %d: x=%d-%d, y=%d-%d\n", i, carta_x, carta_x + LARGURA_CARTA, mao_y, mao_y + ALTURA_CARTA);
 
 						if (evento->button.x >= carta_x &&
 						    evento->button.x <= carta_x + LARGURA_CARTA &&

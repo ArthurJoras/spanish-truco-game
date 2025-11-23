@@ -60,8 +60,6 @@ bool conectar_servidor(const char* ip, int porta) {
 	for (int tentativa = 0; tentativa < MAX_TENTATIVAS; tentativa++) {
 		if (tentativa > 0) {
 			int delay = DELAY_BASE << (tentativa - 1);  // 2, 4, 8 segundos
-			printf("Tentando reconectar em %d segundos... (tentativa %d/%d)\n",
-			       delay, tentativa + 1, MAX_TENTATIVAS);
 			sleep(delay);
 		}
 
@@ -100,7 +98,6 @@ bool conectar_servidor(const char* ip, int porta) {
 		// Inicia thread de recebimento
 		pthread_create(&cliente.thread_recebimento, NULL, thread_receber_mensagens, NULL);
 
-		printf("Conectado ao servidor %s:%d\n", ip, porta);
 		return true;
 	}
 
@@ -140,7 +137,6 @@ void processar_mensagem_recebida(Mensagem* msg) {
 			if (msg->jogador_id != 0) {
 				cliente.id = msg->jogador_id;
 				cliente.estado.meu_id = msg->jogador_id;
-				printf("Conectado! ID: %u\n", cliente.id);
 				snprintf(cliente.estado.mensagem_temporaria, sizeof(cliente.estado.mensagem_temporaria),
 				         "Conectado! ID: %u", cliente.id);
 				cliente.estado.tempo_mensagem = 3.0f;
@@ -151,7 +147,6 @@ void processar_mensagem_recebida(Mensagem* msg) {
 			cliente.estado.sala_id = msg->sala_id;
 			cliente.estado.num_jogadores_sala = 1;  // Criador é o primeiro jogador
 			cliente.estado.tela_atual = TELA_LOBBY;
-			printf("Sala criada: %u\n", cliente.estado.sala_id);
 			snprintf(cliente.estado.mensagem_temporaria, sizeof(cliente.estado.mensagem_temporaria),
 			         "Sala criada: %u", cliente.estado.sala_id);
 			cliente.estado.tempo_mensagem = 3.0f;
@@ -160,7 +155,6 @@ void processar_mensagem_recebida(Mensagem* msg) {
 		case MSG_ENTRAR_SALA:
 			if (msg->jogador_id == 0) {
 				// Alguém saiu da sala
-				printf("Jogador saiu da sala!\n");
 				cliente.estado.num_jogadores_sala = 1;
 				cliente.estado.precisa_reconfigurar_botoes = true;
 				snprintf(cliente.estado.mensagem_temporaria, sizeof(cliente.estado.mensagem_temporaria),
@@ -172,10 +166,8 @@ void processar_mensagem_recebida(Mensagem* msg) {
 				cliente.estado.num_jogadores_sala = 1;
 				cliente.estado.tela_atual = TELA_LOBBY;
 				cliente.estado.precisa_reconfigurar_botoes = true;
-				printf("Entrou na sala %u\n", cliente.estado.sala_id);
 			} else {
 				// OUTRO jogador entrou
-				printf("Outro jogador entrou na sala!\n");
 				cliente.estado.num_jogadores_sala = 2;
 				cliente.estado.precisa_reconfigurar_botoes = true;
 				snprintf(cliente.estado.mensagem_temporaria, sizeof(cliente.estado.mensagem_temporaria),
@@ -189,7 +181,6 @@ void processar_mensagem_recebida(Mensagem* msg) {
 			memcpy(cliente.estado.salas, msg->dados, msg->tamanho_dados);
 			cliente.estado.tela_atual = TELA_LISTAR_SALAS;
 			cliente.estado.precisa_reconfigurar_botoes = true;
-			printf("Recebidas %d salas\n", num);
 			break;
 		}
 		case MSG_ESTADO_JOGO:
@@ -200,34 +191,13 @@ void processar_mensagem_recebida(Mensagem* msg) {
 
 			// Reset carta selecionada se o índice está inválido
 			if (cliente.ui.carta_selecionada >= cliente.estado.estado_jogo.num_cartas_mao) {
-				printf("Resetando carta_selecionada (era %d, mas só há %d cartas)\n",
-				       cliente.ui.carta_selecionada, cliente.estado.estado_jogo.num_cartas_mao);
 				cliente.ui.carta_selecionada = -1;
 			}
 
 			cliente.estado.em_partida = true;
 			cliente.estado.tela_atual = TELA_JOGO;
 			cliente.estado.precisa_reconfigurar_botoes = true;
-			printf("Estado recebido - Vez: %d, Mao: %d, NumCartas: %d, Pode_Truco: %d\n",
-			       cliente.estado.estado_jogo.vez_jogador,
-			       cliente.estado.estado_jogo.mao_jogador,
-			       cliente.estado.estado_jogo.num_cartas_mao,
-			       cliente.estado.estado_jogo.pode_cantar_truco);
-			printf("  Mesa R1:[%d-%d][%d-%d] R2:[%d-%d][%d-%d] R3:[%d-%d][%d-%d]\n",
-			       cliente.estado.estado_jogo.cartas_jogadas_rodada[0].naipe,
-			       cliente.estado.estado_jogo.cartas_jogadas_rodada[0].numero,
-			       cliente.estado.estado_jogo.cartas_jogadas_rodada[1].naipe,
-			       cliente.estado.estado_jogo.cartas_jogadas_rodada[1].numero,
-			       cliente.estado.estado_jogo.cartas_jogadas_rodada[2].naipe,
-			       cliente.estado.estado_jogo.cartas_jogadas_rodada[2].numero,
-			       cliente.estado.estado_jogo.cartas_jogadas_rodada[3].naipe,
-			       cliente.estado.estado_jogo.cartas_jogadas_rodada[3].numero,
-			       cliente.estado.estado_jogo.cartas_jogadas_rodada[4].naipe,
-			       cliente.estado.estado_jogo.cartas_jogadas_rodada[4].numero,
-			       cliente.estado.estado_jogo.cartas_jogadas_rodada[5].naipe,
-			       cliente.estado.estado_jogo.cartas_jogadas_rodada[5].numero);
 			break;
-		case MSG_TRUCO:
 			printf("TRUCO cantado!\n");
 			cliente.estado.tipo_canto_aguardando = MSG_TRUCO;
 			snprintf(cliente.estado.mensagem_temporaria, sizeof(cliente.estado.mensagem_temporaria),
@@ -299,8 +269,6 @@ void* thread_receber_mensagens(void* arg) {
 			bool reconectou = false;
 			for (int tentativa = 0; tentativa < MAX_TENTATIVAS; tentativa++) {
 				int delay = DELAY_BASE << tentativa;
-				printf("Tentando reconectar em %d segundos... (tentativa %d/%d)\n",
-				       delay, tentativa + 1, MAX_TENTATIVAS);
 
 				pthread_mutex_lock(&cliente.mutex_estado);
 				snprintf(cliente.estado.mensagem_temporaria,
@@ -464,9 +432,6 @@ void callback_voltar_menu(void* data) {
 void callback_jogar_carta(void* data) {
 	(void)data;
 
-	printf("callback_jogar_carta chamado - carta_selecionada: %d, num_cartas: %d\n",
-	       cliente.ui.carta_selecionada, cliente.estado.estado_jogo.num_cartas_mao);
-
 	if (cliente.ui.carta_selecionada < 0) {
 		snprintf(cliente.estado.mensagem_temporaria, sizeof(cliente.estado.mensagem_temporaria),
 		         "Selecione uma carta!");
@@ -500,8 +465,6 @@ void callback_jogar_carta(void* data) {
 void callback_truco(void* data) {
 	(void)data;
 
-	printf("callback_truco chamado\n");
-
 	// Validações antes de enviar
 	if (cliente.estado.estado_jogo.aguardando_resposta) {
 		printf("  ERRO: Aguardando resposta\n");
@@ -529,8 +492,6 @@ void callback_truco(void* data) {
 
 void callback_envido(void* data) {
 	(void)data;
-
-	printf("callback_envido chamado\n");
 
 	// Validações
 	if (cliente.estado.estado_jogo.aguardando_resposta) {
@@ -567,8 +528,6 @@ void callback_envido(void* data) {
 
 void callback_flor(void* data) {
 	(void)data;
-
-	printf("callback_flor chamado\n");
 
 	// Validações
 	if (cliente.estado.estado_jogo.aguardando_resposta) {
@@ -753,11 +712,6 @@ void configurar_botoes_lobby() {
 void configurar_botoes_jogo() {
 	ui_limpar_botoes(&cliente.ui);
 	cliente.ui.carta_selecionada = -1;  // Reset seleção
-
-	printf("Configurando botões - Aguardando: %d, Vez: %d, Pode_Truco: %d\n",
-	       cliente.estado.aguardando_resposta_canto,
-	       cliente.estado.estado_jogo.vez_jogador,
-	       cliente.estado.estado_jogo.pode_cantar_truco);
 
 	if (cliente.estado.aguardando_resposta_canto) {
 		// Botões de resposta
