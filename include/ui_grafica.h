@@ -83,6 +83,8 @@ typedef enum {
 typedef struct {
 	TipoTela tela_atual;
 	uint32_t sala_id;
+	uint32_t meu_id;         // ID do cliente local
+	int num_jogadores_sala;  // Número de jogadores na sala atual
 	bool em_partida;
 	EstadoJogo estado_jogo;
 	InfoSala salas[MAX_SALAS];
@@ -92,7 +94,7 @@ typedef struct {
 	TipoMensagem tipo_canto_aguardando;
 	char mensagem_temporaria[256];
 	float tempo_mensagem;
-	int vencedor_partida;
+	uint32_t vencedor_partida;
 	bool precisa_reconfigurar_botoes;
 } UIEstado;
 

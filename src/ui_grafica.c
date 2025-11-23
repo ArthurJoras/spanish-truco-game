@@ -503,11 +503,6 @@ void ui_renderizar_jogo(UIGrafica* ui, UIEstado* estado) {
 		                  ui->font_normal, cor_branca);
 	}
 
-	// Área central - MESA (desenhar antes para ficar por baixo)
-	int centro_y = ALTURA_JANELA / 2 - ALTURA_CARTA / 2;
-	ui_desenhar_texto(ui, "MESA", LARGURA_JANELA / 2 - 30, centro_y - 30,
-	                  ui->font_normal, cor_branca);
-
 	// Cartas do oponente (verso) - acima da mesa
 	int oponente_y = 180;
 	int oponente_x = LARGURA_JANELA / 2 - (LARGURA_CARTA + ESPACAMENTO_CARTA);
@@ -517,6 +512,7 @@ void ui_renderizar_jogo(UIGrafica* ui, UIEstado* estado) {
 
 	// Cartas jogadas em TODAS as rodadas (3 rodadas, 2 cartas cada)
 	// Layout: Cada rodada em uma coluna, J1 em cima, J2 embaixo
+	int centro_y = ALTURA_JANELA / 2 - ALTURA_CARTA / 2;
 	int mesa_y = centro_y + 10;
 	int rodada_spacing = LARGURA_CARTA + 30;
 	int inicio_x = LARGURA_JANELA / 2 - (rodada_spacing * 3) / 2 + 15;
@@ -557,7 +553,7 @@ void ui_renderizar_fim_partida(UIGrafica* ui, UIEstado* estado) {
 	ui_desenhar_texto(ui, "FIM DE PARTIDA!", LARGURA_JANELA / 2 - 150, 200,
 	                  ui->font_titulo, cor_branca);
 
-	if (estado->vencedor_partida == 1) {
+	if (estado->vencedor_partida == estado->meu_id) {
 		ui_desenhar_texto(ui, "VOCE VENCEU!", LARGURA_JANELA / 2 - 100, 300,
 		                  ui->font_normal, cor_verde);
 	} else {

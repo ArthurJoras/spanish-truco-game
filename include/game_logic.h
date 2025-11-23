@@ -43,6 +43,8 @@ typedef struct {
 	int pontos_jogador1;
 	int pontos_jogador2;
 	int valor_rodada;  // Valor atual da rodada (1, 2, 3, 4)
+	int valor_envido;  // Valor atual do envido (2=Envido, 3=Real, 4=Falta)
+	int valor_flor;    // Valor atual da flor (3=Flor, 4=Contraflor, 5=Contraflor Resto)
 	bool truco_cantado;
 	bool envido_cantado;
 	bool flor_cantada;
@@ -52,8 +54,8 @@ typedef struct {
 	int jogador_cantou_truco;
 	int jogador_cantou_envido;
 	int jogador_cantou_flor;
-	int ultimo_a_aumentar_truco;  // Último jogador a aumentar aposta (Retruco/Vale4)
-	int ultimo_a_aumentar_envido; // Último jogador a aumentar aposta (Real/Falta Envido)
+	int ultimo_a_aumentar_truco;   // Último jogador a aumentar aposta (Retruco/Vale4)
+	int ultimo_a_aumentar_envido;  // Último jogador a aumentar aposta (Real/Falta Envido)
 	bool partida_finalizada;
 	int vencedor_partida;
 } Jogo;

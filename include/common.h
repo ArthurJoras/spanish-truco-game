@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#define PORTA_PADRAO 8888
+#define SERVER_IP_PADRAO "127.0.0.1"
+#define SERVER_PORTA_PADRAO PORTA_PADRAO
+
 // Enums para identificação das cartas
 typedef enum {
 	NAIPE_ESPADAS = 0,
@@ -49,8 +53,8 @@ typedef enum {
 	MSG_FIM_PARTIDA = 14,
 	MSG_ERRO = 15,
 	MSG_DESCONECTAR = 16,
-	MSG_PONTOS_ENVIDO = 17,
-	MSG_IR_BARALHO = 18
+	MSG_IR_BARALHO = 17,
+	MSG_SAIR_SALA = 18
 } TipoMensagem;
 
 // Respostas ao truco
@@ -106,6 +110,8 @@ typedef struct {
 	uint8_t mao_jogador;
 	uint8_t vez_jogador;
 	uint8_t valor_rodada;
+	uint8_t valor_envido;
+	uint8_t valor_flor;
 	uint8_t pode_cantar_truco;
 	uint8_t pode_cantar_envido;
 	uint8_t pode_cantar_flor;
@@ -113,7 +119,6 @@ typedef struct {
 } EstadoJogo;
 
 // Constantes
-#define PORTA_PADRAO 8888
 #define MAX_CLIENTES 100
 #define MAX_SALAS 50
 #define PONTOS_VITORIA 15

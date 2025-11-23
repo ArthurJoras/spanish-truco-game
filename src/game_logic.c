@@ -336,29 +336,33 @@ void responder_truco(Jogo* jogo, int jogador, RespostaTruco resposta) {
 			break;
 
 		case RESPOSTA_NAO_QUERO:
-			// Quem cantou truco ganha os pontos atuais
+			// Quem cantou truco ganha os pontos anteriores (valor_rodada - 1)
+			// Truco (valor=2) dá 1, Retruco (valor=3) dá 2, Vale4 (valor=4) dá 3
+			int pontos_truco = jogo->valor_rodada - 1;
 			if (jogo->jogador_cantou_truco == 1) {
-				jogo->pontos_jogador1 += jogo->valor_rodada;
+				jogo->pontos_jogador1 += pontos_truco;
 			} else {
-				jogo->pontos_jogador2 += jogo->valor_rodada;
+				jogo->pontos_jogador2 += pontos_truco;
 			}
 			verificar_fim_partida(jogo);
 			if (!jogo->partida_finalizada) nova_mao(jogo);
 			break;
 
-	case RESPOSTA_RETRUCO:
-		jogo->valor_rodada = 3;
-		jogo->aguardando_resposta_truco = true;
-		jogo->jogador_cantou_truco = jogador;
-		jogo->ultimo_a_aumentar_truco = jogador;
-		break;
+		case RESPOSTA_RETRUCO:
+			// Retruco incrementa para 3
+			jogo->valor_rodada = 3;
+			jogo->aguardando_resposta_truco = true;
+			jogo->jogador_cantou_truco = jogador;
+			jogo->ultimo_a_aumentar_truco = jogador;
+			break;
 
-	case RESPOSTA_VALE_QUATRO:
-		jogo->valor_rodada = 4;
-		jogo->aguardando_resposta_truco = true;
-		jogo->jogador_cantou_truco = jogador;
-		jogo->ultimo_a_aumentar_truco = jogador;
-		break;
+		case RESPOSTA_VALE_QUATRO:
+			// Vale Quatro incrementa para 4
+			jogo->valor_rodada = 4;
+			jogo->aguardando_resposta_truco = true;
+			jogo->jogador_cantou_truco = jogador;
+			jogo->ultimo_a_aumentar_truco = jogador;
+			break;
 	}
 }
 
@@ -385,6 +389,7 @@ bool cantar_envido(Jogo* jogo, int jogador) {
 	jogo->aguardando_resposta_envido = true;
 	jogo->jogador_cantou_envido = jogador;
 	jogo->ultimo_a_aumentar_envido = jogador;
+	jogo->valor_envido = 2;  // Envido base vale 2
 
 	return true;
 }
@@ -401,8 +406,15 @@ void responder_envido(Jogo* jogo, int jogador, RespostaEnvido resposta) {
 			int pontos_j1 = jogo->jogador1.pontos_envido;
 			int pontos_j2 = jogo->jogador2.pontos_envido;
 
-			int pontos_ganhos = 2;  // Envido simples
+			// Usa valor_envido: 2=Envido, 3=Real Envido, 4=Falta Envido
+			int pontos_ganhos = jogo->valor_envido;
 
+			// Falta Envido: vale os pontos que faltam para 15 MENOS 1
+			if (jogo->valor_envido == 4) {
+				int pontos_oponente = (jogo->jogador_cantou_envido == 1) ? jogo->pontos_jogador2 : jogo->pontos_jogador1;
+				pontos_ganhos = 15 - pontos_oponente - 1;
+				if (pontos_ganhos < 1) pontos_ganhos = 1;  // Mínimo 1 ponto
+			}
 			if (pontos_j1 > pontos_j2) {
 				jogo->pontos_jogador1 += pontos_ganhos;
 			} else if (pontos_j2 > pontos_j1) {
@@ -420,18 +432,27 @@ void responder_envido(Jogo* jogo, int jogador, RespostaEnvido resposta) {
 		}
 
 		case ENVIDO_NAO_QUERO:
-			// Quem cantou ganha 1 ponto
+			// Quem cantou ganha os pontos acumulados (valor_envido - 1)
+			// Envido=2 dá 1, Real=3 dá 2, Falta=4 dá 3
+			int pontos = jogo->valor_envido - 1;
 			if (jogo->jogador_cantou_envido == 1) {
-				jogo->pontos_jogador1 += 1;
+				jogo->pontos_jogador1 += pontos;
 			} else {
-				jogo->pontos_jogador2 += 1;
+				jogo->pontos_jogador2 += pontos;
 			}
 			verificar_fim_partida(jogo);
 			break;
-
 		case ENVIDO_REAL_ENVIDO:
+			// Real Envido aumenta para 3
+			jogo->valor_envido = 3;
+			jogo->aguardando_resposta_envido = true;
+			jogo->jogador_cantou_envido = jogador;
+			jogo->ultimo_a_aumentar_envido = jogador;
+			break;
+
 		case ENVIDO_FALTA_ENVIDO:
-			// Implementação mais complexa - por enquanto trata como quero
+			// Falta Envido aumenta para 4
+			jogo->valor_envido = 4;
 			jogo->aguardando_resposta_envido = true;
 			jogo->jogador_cantou_envido = jogador;
 			jogo->ultimo_a_aumentar_envido = jogador;
@@ -459,10 +480,18 @@ bool pode_cantar_flor(Jogo* jogo, int jogador) {
 bool cantar_flor(Jogo* jogo, int jogador) {
 	if (!pode_cantar_flor(jogo, jogador)) return false;
 
+	// No truco espanhol, se um jogador tem flor, ele automaticamente ganha 3 pontos
+	// Não há "resposta" à flor como no envido
 	jogo->flor_cantada = true;
-	jogo->aguardando_resposta_flor = true;
-	jogo->jogador_cantou_flor = jogador;
 
+	// Dá 3 pontos direto para quem cantou
+	if (jogador == 1) {
+		jogo->pontos_jogador1 += 3;
+	} else {
+		jogo->pontos_jogador2 += 3;
+	}
+
+	verificar_fim_partida(jogo);
 	return true;
 }
 
@@ -555,6 +584,8 @@ EstadoJogo obter_estado_jogo(Jogo* jogo, int jogador) {
 	// Converte vez_jogador para ser relativa (1 = sua vez, 2 = vez do oponente)
 	estado.vez_jogador = (jogo->vez_jogador == jogador) ? 1 : 2;
 	estado.valor_rodada = jogo->valor_rodada;
+	estado.valor_envido = jogo->valor_envido;
+	estado.valor_flor = jogo->valor_flor;
 
 	// Copia as cartas da mão do jogador
 	Jogador* j = (jogador == 1) ? &jogo->jogador1 : &jogo->jogador2;

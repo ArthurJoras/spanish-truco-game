@@ -1,5 +1,6 @@
 #include <SDL2/SDL.h>
 #include <arpa/inet.h>
+#include <errno.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -16,6 +17,8 @@ typedef struct {
 	int socket;
 	uint32_t id;
 	bool conectado;
+	char server_ip[16];
+	int server_porta;
 	UIGrafica ui;
 	UIEstado estado;
 	pthread_t thread_recebimento;
@@ -51,37 +54,57 @@ void callback_sair(void* data);
 
 // Implementações
 bool conectar_servidor(const char* ip, int porta) {
-	cliente.socket = socket(AF_INET, SOCK_STREAM, 0);
-	if (cliente.socket < 0) {
-		perror("Erro ao criar socket");
-		return false;
+	const int MAX_TENTATIVAS = 3;
+	const int DELAY_BASE = 2;  // segundos
+
+	for (int tentativa = 0; tentativa < MAX_TENTATIVAS; tentativa++) {
+		if (tentativa > 0) {
+			int delay = DELAY_BASE << (tentativa - 1);  // 2, 4, 8 segundos
+			printf("Tentando reconectar em %d segundos... (tentativa %d/%d)\n",
+			       delay, tentativa + 1, MAX_TENTATIVAS);
+			sleep(delay);
+		}
+
+		cliente.socket = socket(AF_INET, SOCK_STREAM, 0);
+		if (cliente.socket < 0) {
+			perror("Erro ao criar socket");
+			continue;
+		}
+
+		struct sockaddr_in server_addr;
+		memset(&server_addr, 0, sizeof(server_addr));
+		server_addr.sin_family = AF_INET;
+		server_addr.sin_port = htons(porta);
+
+		if (inet_pton(AF_INET, ip, &server_addr.sin_addr) <= 0) {
+			perror("Endereço inválido");
+			close(cliente.socket);
+			continue;
+		}
+
+		if (connect(cliente.socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+			perror("Erro ao conectar");
+			close(cliente.socket);
+			if (tentativa < MAX_TENTATIVAS - 1) {
+				continue;  // Tenta novamente
+			} else {
+				return false;  // Última tentativa falhou
+			}
+		}
+
+		cliente.conectado = true;
+		strncpy(cliente.server_ip, ip, sizeof(cliente.server_ip) - 1);
+		cliente.server_porta = porta;
+		pthread_mutex_init(&cliente.mutex_estado, NULL);
+
+		// Inicia thread de recebimento
+		pthread_create(&cliente.thread_recebimento, NULL, thread_receber_mensagens, NULL);
+
+		printf("Conectado ao servidor %s:%d\n", ip, porta);
+		return true;
 	}
 
-	struct sockaddr_in server_addr;
-	memset(&server_addr, 0, sizeof(server_addr));
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_port = htons(porta);
-
-	if (inet_pton(AF_INET, ip, &server_addr.sin_addr) <= 0) {
-		perror("Endereço inválido");
-		close(cliente.socket);
-		return false;
-	}
-
-	if (connect(cliente.socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-		perror("Erro ao conectar");
-		close(cliente.socket);
-		return false;
-	}
-
-	cliente.conectado = true;
-	pthread_mutex_init(&cliente.mutex_estado, NULL);
-
-	// Inicia thread de recebimento
-	pthread_create(&cliente.thread_recebimento, NULL, thread_receber_mensagens, NULL);
-
-	printf("Conectado ao servidor %s:%d\n", ip, porta);
-	return true;
+	return false;  // Todas as tentativas falharam
 }
 
 void desconectar_servidor() {
@@ -113,15 +136,20 @@ void processar_mensagem_recebida(Mensagem* msg) {
 
 	switch (msg->tipo) {
 		case MSG_CONECTAR:
-			cliente.id = msg->jogador_id;
-			printf("Conectado! ID: %u\n", cliente.id);
-			snprintf(cliente.estado.mensagem_temporaria, sizeof(cliente.estado.mensagem_temporaria),
-			         "Conectado! ID: %u", cliente.id);
-			cliente.estado.tempo_mensagem = 3.0f;
+			// Só processa se for conexão inicial (tem jogador_id)
+			if (msg->jogador_id != 0) {
+				cliente.id = msg->jogador_id;
+				cliente.estado.meu_id = msg->jogador_id;
+				printf("Conectado! ID: %u\n", cliente.id);
+				snprintf(cliente.estado.mensagem_temporaria, sizeof(cliente.estado.mensagem_temporaria),
+				         "Conectado! ID: %u", cliente.id);
+				cliente.estado.tempo_mensagem = 3.0f;
+			}
+			// Se jogador_id == 0, é resposta de MSG_SAIR_SALA (ignora)
 			break;
-
 		case MSG_CRIAR_SALA:
 			cliente.estado.sala_id = msg->sala_id;
+			cliente.estado.num_jogadores_sala = 1;  // Criador é o primeiro jogador
 			cliente.estado.tela_atual = TELA_LOBBY;
 			printf("Sala criada: %u\n", cliente.estado.sala_id);
 			snprintf(cliente.estado.mensagem_temporaria, sizeof(cliente.estado.mensagem_temporaria),
@@ -130,18 +158,31 @@ void processar_mensagem_recebida(Mensagem* msg) {
 			break;
 
 		case MSG_ENTRAR_SALA:
-			if (msg->jogador_id != cliente.id) {
+			if (msg->jogador_id == 0) {
+				// Alguém saiu da sala
+				printf("Jogador saiu da sala!\n");
+				cliente.estado.num_jogadores_sala = 1;
+				cliente.estado.precisa_reconfigurar_botoes = true;
+				snprintf(cliente.estado.mensagem_temporaria, sizeof(cliente.estado.mensagem_temporaria),
+				         "Jogador saiu! Aguardando outro jogador...");
+				cliente.estado.tempo_mensagem = 3.0f;
+			} else if (msg->jogador_id == cliente.id) {
+				// EU entrei na sala
+				cliente.estado.sala_id = msg->sala_id;
+				cliente.estado.num_jogadores_sala = 1;
+				cliente.estado.tela_atual = TELA_LOBBY;
+				cliente.estado.precisa_reconfigurar_botoes = true;
+				printf("Entrou na sala %u\n", cliente.estado.sala_id);
+			} else {
+				// OUTRO jogador entrou
 				printf("Outro jogador entrou na sala!\n");
+				cliente.estado.num_jogadores_sala = 2;
+				cliente.estado.precisa_reconfigurar_botoes = true;
 				snprintf(cliente.estado.mensagem_temporaria, sizeof(cliente.estado.mensagem_temporaria),
 				         "Jogador entrou! Pronto para iniciar");
 				cliente.estado.tempo_mensagem = 3.0f;
-			} else {
-				cliente.estado.sala_id = msg->sala_id;
-				cliente.estado.tela_atual = TELA_LOBBY;
-				printf("Entrou na sala %u\n", cliente.estado.sala_id);
 			}
 			break;
-
 		case MSG_LISTAR_SALAS: {
 			int num = msg->tamanho_dados / sizeof(InfoSala);
 			cliente.estado.num_salas = num;
@@ -219,11 +260,19 @@ void processar_mensagem_recebida(Mensagem* msg) {
 
 		case MSG_ERRO:
 			printf("Erro recebido do servidor\n");
-			snprintf(cliente.estado.mensagem_temporaria, sizeof(cliente.estado.mensagem_temporaria),
-			         "Erro na operacao!");
+			// Verifica se há mensagem de erro específica
+			if (msg->tamanho_dados > 0 && msg->dados[0] != '\0') {
+				char msg_erro[256];
+				memcpy(msg_erro, msg->dados, sizeof(msg_erro));
+				msg_erro[255] = '\0';  // Garante null-termination
+				snprintf(cliente.estado.mensagem_temporaria, sizeof(cliente.estado.mensagem_temporaria),
+				         "%s", msg_erro);
+			} else {
+				snprintf(cliente.estado.mensagem_temporaria, sizeof(cliente.estado.mensagem_temporaria),
+				         "Erro na operacao!");
+			}
 			cliente.estado.tempo_mensagem = 3.0f;
 			break;
-
 		default:
 			break;
 	}
@@ -234,16 +283,99 @@ void processar_mensagem_recebida(Mensagem* msg) {
 void* thread_receber_mensagens(void* arg) {
 	(void)arg;
 	Mensagem msg;
+	const int MAX_TENTATIVAS = 3;
+	const int DELAY_BASE = 2;
 
 	while (cliente.conectado) {
 		int bytes = recv(cliente.socket, &msg, sizeof(Mensagem), 0);
 
 		if (bytes == sizeof(Mensagem)) {
 			processar_mensagem_recebida(&msg);
-		} else if (bytes == 0) {
-			printf("Servidor desconectado\n");
-			cliente.conectado = false;
-			break;
+		} else if (bytes == 0 || bytes < 0) {
+			printf("Conexão perdida com o servidor\n");
+			close(cliente.socket);
+
+			// Tentar reconectar
+			bool reconectou = false;
+			for (int tentativa = 0; tentativa < MAX_TENTATIVAS; tentativa++) {
+				int delay = DELAY_BASE << tentativa;
+				printf("Tentando reconectar em %d segundos... (tentativa %d/%d)\n",
+				       delay, tentativa + 1, MAX_TENTATIVAS);
+
+				pthread_mutex_lock(&cliente.mutex_estado);
+				snprintf(cliente.estado.mensagem_temporaria,
+				         sizeof(cliente.estado.mensagem_temporaria),
+				         "Reconectando em %ds... (%d/%d)",
+				         delay, tentativa + 1, MAX_TENTATIVAS);
+				cliente.estado.tempo_mensagem = (float)delay;
+				pthread_mutex_unlock(&cliente.mutex_estado);
+
+				sleep(delay);
+
+				// Tentar reconectar
+				printf("Criando socket...\n");
+				cliente.socket = socket(AF_INET, SOCK_STREAM, 0);
+				if (cliente.socket >= 0) {
+					printf("Socket criado: %d\n", cliente.socket);
+					struct sockaddr_in server_addr;
+					memset(&server_addr, 0, sizeof(server_addr));
+					server_addr.sin_family = AF_INET;
+					server_addr.sin_port = htons(cliente.server_porta);
+					inet_pton(AF_INET, cliente.server_ip, &server_addr.sin_addr);
+
+					printf("Tentando connect() em %s:%d...\n", cliente.server_ip, cliente.server_porta);
+					int connect_result = connect(cliente.socket, (struct sockaddr*)&server_addr,
+					                             sizeof(server_addr));
+					printf("connect() retornou: %d (errno: %d)\n", connect_result, errno);
+
+					if (connect_result == 0) {
+						printf("Reconectado com sucesso!\n");
+
+						// Resetar estado do cliente (perdeu contexto no servidor)
+						pthread_mutex_lock(&cliente.mutex_estado);
+						cliente.estado.sala_id = 0;
+						cliente.estado.num_jogadores_sala = 0;
+						cliente.estado.tela_atual = TELA_MENU_PRINCIPAL;
+						cliente.estado.precisa_reconfigurar_botoes = true;
+						snprintf(cliente.estado.mensagem_temporaria,
+						         sizeof(cliente.estado.mensagem_temporaria),
+						         "Reconectado! Voltando ao menu...");
+						cliente.estado.tempo_mensagem = 3.0f;
+						pthread_mutex_unlock(&cliente.mutex_estado);
+
+						// Reautenticar com servidor
+						Mensagem msg_conectar;
+						memset(&msg_conectar, 0, sizeof(Mensagem));
+						msg_conectar.tipo = MSG_CONECTAR;
+						if (send(cliente.socket, &msg_conectar, sizeof(Mensagem), 0) > 0) {
+							reconectou = true;
+							break;
+						} else {
+							// Falha ao enviar MSG_CONECTAR
+							printf("Falha ao reautenticar\n");
+							close(cliente.socket);
+						}
+					} else {
+						// Falha no connect()
+						printf("Falha ao conectar (tentativa %d/%d)\n", tentativa + 1, MAX_TENTATIVAS);
+						close(cliente.socket);
+					}
+				} else {
+					printf("Falha ao criar socket\n");
+				}
+			}
+			if (!reconectou) {
+				printf("Falha ao reconectar. Encerrando...\n");
+				pthread_mutex_lock(&cliente.mutex_estado);
+				snprintf(cliente.estado.mensagem_temporaria,
+				         sizeof(cliente.estado.mensagem_temporaria),
+				         "Servidor offline. Fechando...");
+				cliente.estado.tempo_mensagem = 2.0f;
+				pthread_mutex_unlock(&cliente.mutex_estado);
+				sleep(2);
+				cliente.conectado = false;
+				break;
+			}
 		}
 	}
 
@@ -309,6 +441,23 @@ void callback_iniciar_partida(void* data) {
 
 void callback_voltar_menu(void* data) {
 	(void)data;
+
+	// Se estava em uma sala, notifica servidor
+	if (cliente.estado.sala_id != 0) {
+		Mensagem msg;
+		memset(&msg, 0, sizeof(Mensagem));
+		msg.tipo = MSG_SAIR_SALA;
+		msg.sala_id = cliente.estado.sala_id;
+		enviar_mensagem(&msg);
+
+		cliente.estado.sala_id = 0;
+		cliente.estado.num_jogadores_sala = 0;
+	}
+
+	// Volta para o menu principal
+	cliente.estado.tela_atual = TELA_MENU_PRINCIPAL;
+	cliente.estado.precisa_reconfigurar_botoes = true;
+
 	cliente.estado.tela_atual = TELA_MENU_PRINCIPAL;
 }
 
@@ -595,7 +744,9 @@ void configurar_botoes_listar_salas() {
 void configurar_botoes_lobby() {
 	ui_limpar_botoes(&cliente.ui);
 
-	ui_adicionar_botao(&cliente.ui, 100, 400, 200, 50, "Iniciar Partida", callback_iniciar_partida, NULL);
+	if (cliente.estado.num_jogadores_sala >= 2) {
+		ui_adicionar_botao(&cliente.ui, 100, 400, 200, 50, "Iniciar Partida", callback_iniciar_partida, NULL);
+	}
 	ui_adicionar_botao(&cliente.ui, 100, 470, 200, 50, "Voltar", callback_voltar_menu, NULL);
 }
 
@@ -618,17 +769,24 @@ void configurar_botoes_jogo() {
 		// Botões para aumentar aposta
 		if (cliente.estado.tipo_canto_aguardando == MSG_TRUCO) {
 			y += 70;
-			// Mostrar "Retruco!" se valor_rodada==2 (após Truco), "Vale Quatro!" se valor_rodada==3 (após Retruco)
-			if (cliente.estado.estado_jogo.valor_rodada == 2) {
+			// Mostrar "Retruco!" se valor_rodada==1 (Truco inicial), "Vale Quatro!" se valor_rodada==3 (após Retruco aceito)
+			// Quando Retruco é cantado como resposta, valor_rodada já vai para 3
+			if (cliente.estado.estado_jogo.valor_rodada == 1) {
 				ui_adicionar_botao(&cliente.ui, LARGURA_JANELA - 220, y, 200, 50, "Retruco!", callback_retruco, NULL);
 			} else if (cliente.estado.estado_jogo.valor_rodada == 3) {
 				ui_adicionar_botao(&cliente.ui, LARGURA_JANELA - 220, y, 200, 50, "Vale Quatro!", callback_vale_quatro, NULL);
 			}
 		} else if (cliente.estado.tipo_canto_aguardando == MSG_ENVIDO) {
-			y += 70;
-			ui_adicionar_botao(&cliente.ui, LARGURA_JANELA - 220, y, 200, 50, "Real Envido", callback_real_envido, NULL);
-			y += 70;
-			ui_adicionar_botao(&cliente.ui, LARGURA_JANELA - 220, y, 200, 50, "Falta Envido", callback_falta_envido, NULL);
+			// Só mostrar Real Envido se ainda não foi cantado (valor_envido == 2)
+			if (cliente.estado.estado_jogo.valor_envido == 2) {
+				y += 70;
+				ui_adicionar_botao(&cliente.ui, LARGURA_JANELA - 220, y, 200, 50, "Real Envido", callback_real_envido, NULL);
+			}
+			// Falta Envido sempre disponível (exceto se já foi cantado)
+			if (cliente.estado.estado_jogo.valor_envido < 4) {
+				y += 70;
+				ui_adicionar_botao(&cliente.ui, LARGURA_JANELA - 220, y, 200, 50, "Falta Envido", callback_falta_envido, NULL);
+			}
 		}
 	} else {
 		// Botões de ação
@@ -660,8 +818,8 @@ void configurar_botoes_fim_partida() {
 }
 
 int main(int argc, char* argv[]) {
-	char ip[16] = "127.0.0.1";
-	int porta = PORTA_PADRAO;
+	char ip[16] = SERVER_IP_PADRAO;
+	int porta = SERVER_PORTA_PADRAO;
 
 	if (argc > 1) {
 		strncpy(ip, argv[1], sizeof(ip) - 1);

@@ -1,6 +1,8 @@
 #!/bin/bash
 # Script de início rápido para o Truco Espanhol
 
+clear
+
 echo "=========================================="
 echo "  🃏 Truco Espanhol - Início Rápido"
 echo "=========================================="
@@ -16,10 +18,9 @@ fi
 echo "Escolha uma opção:"
 echo "  1) Iniciar Servidor"
 echo "  2) Iniciar Cliente Gráfico"
-echo "  3) Iniciar Cliente Terminal"
-echo "  4) Demo (Servidor + 2 Clientes)"
-echo "  5) Parar Servidor"
-echo "  6) Recompilar tudo"
+echo "  3) Demo (Servidor em background)"
+echo "  4) Parar Servidor"
+echo "  5) Recompilar tudo"
 echo "  0) Sair"
 echo ""
 read -p "Opção: " opcao
@@ -34,18 +35,14 @@ case $opcao in
         ./build/cliente_grafico
         ;;
     3)
-        echo "📟 Iniciando cliente terminal..."
-        ./build/cliente
-        ;;
-    4)
         echo "🎬 Iniciando demo..."
         make demo
         ;;
-    5)
+    4)
         echo "🛑 Parando servidor..."
         make stop-server
         ;;
-    6)
+    5)
         echo "🔨 Recompilando..."
         make clean && make
         ;;

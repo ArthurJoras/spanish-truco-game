@@ -116,9 +116,16 @@ bool entrar_sala(uint32_t sala_id, int socket, uint32_t cliente_id) {
 
 	pthread_mutex_lock(&sala->mutex);
 
+	// Prioriza slot jogador2, mas aceita jogador1 se vazio
 	if (sala->jogador2_socket == -1) {
 		sala->jogador2_socket = socket;
 		sala->jogador2_id = cliente_id;
+		pthread_mutex_unlock(&sala->mutex);
+		return true;
+	} else if (sala->jogador1_socket == -1) {
+		// Se jogador2 está ocupado mas jogador1 vazio (host saiu), aceita como jogador1
+		sala->jogador1_socket = socket;
+		sala->jogador1_id = cliente_id;
 		pthread_mutex_unlock(&sala->mutex);
 		return true;
 	}
@@ -135,17 +142,35 @@ void remover_cliente_da_sala(Cliente* cliente) {
 
 	pthread_mutex_lock(&sala->mutex);
 
+	int jogador_saiu = 0;
+	int socket_restante = -1;
+
 	if (sala->jogador1_socket == cliente->socket) {
 		sala->jogador1_socket = -1;
 		sala->jogador1_id = 0;
+		jogador_saiu = 1;
+		socket_restante = sala->jogador2_socket;
 	} else if (sala->jogador2_socket == cliente->socket) {
 		sala->jogador2_socket = -1;
 		sala->jogador2_id = 0;
+		jogador_saiu = 2;
+		socket_restante = sala->jogador1_socket;
+	}
+
+	// Notifica o jogador restante (se houver)
+	if (socket_restante != -1 && jogador_saiu != 0) {
+		Mensagem notif;
+		memset(&notif, 0, sizeof(Mensagem));
+		notif.tipo = MSG_ENTRAR_SALA;  // Reutiliza mensagem para atualizar contagem
+		notif.sala_id = sala->id;
+		notif.jogador_id = 0;  // 0 indica que alguém saiu
+		enviar_mensagem(socket_restante, &notif);
 	}
 
 	// Se ficou vazia, desativa a sala
 	if (sala->jogador1_socket == -1 && sala->jogador2_socket == -1) {
 		sala->ativa = false;
+		printf("Sala %u destruída (todos saíram)\n", sala->id);
 	}
 
 	pthread_mutex_unlock(&sala->mutex);
@@ -228,6 +253,15 @@ void processar_mensagem(Cliente* cliente, Mensagem* msg) {
 			uint32_t sala_id;
 			memcpy(&sala_id, msg->dados, sizeof(uint32_t));
 
+			// Verifica se já está na sala
+			if (cliente->sala_id == sala_id) {
+				resposta.tipo = MSG_ERRO;
+				const char* msg_erro = "Voce ja esta nesta sala";
+				memcpy(resposta.dados, msg_erro, strlen(msg_erro) + 1);
+				enviar_mensagem(cliente->socket, &resposta);
+				break;
+			}
+
 			if (entrar_sala(sala_id, cliente->socket, cliente->id)) {
 				cliente->sala_id = sala_id;
 				resposta.tipo = MSG_ENTRAR_SALA;
@@ -243,17 +277,29 @@ void processar_mensagem(Cliente* cliente, Mensagem* msg) {
 					memset(&notif, 0, sizeof(Mensagem));
 					notif.tipo = MSG_ENTRAR_SALA;
 					notif.sala_id = sala_id;
+					notif.jogador_id = cliente->id;  // ID do jogador que entrou
 					broadcast_sala(sala, &notif, cliente->socket);
 					pthread_mutex_unlock(&sala->mutex);
 				}
 				printf("Cliente %u entrou na sala %u\n", cliente->id, sala_id);
 			} else {
 				resposta.tipo = MSG_ERRO;
+				const char* msg_erro = "Sala cheia";
+				memcpy(resposta.dados, msg_erro, strlen(msg_erro) + 1);
 				enviar_mensagem(cliente->socket, &resposta);
 			}
 			break;
 		}
 
+		case MSG_SAIR_SALA: {
+			printf("Cliente %u saindo da sala %u\n", cliente->id, cliente->sala_id);
+			remover_cliente_da_sala(cliente);  // Já reseta cliente->sala_id = 0
+			// Envia confirmação (jogador_id=0 indica que é resposta de saída)
+			resposta.tipo = MSG_CONECTAR;
+			resposta.jogador_id = 0;
+			enviar_mensagem(cliente->socket, &resposta);
+			break;
+		}
 		case MSG_INICIAR_PARTIDA: {
 			Sala* sala = obter_sala_por_id(cliente->sala_id);
 			if (sala && sala->jogador1_socket != -1 && sala->jogador2_socket != -1) {
@@ -348,8 +394,10 @@ void processar_mensagem(Cliente* cliente, Mensagem* msg) {
 						broadcast_sala(sala, &fim, -1);
 
 						sala->em_partida = false;
+						sala->ativa = false;  // Destrói a sala após fim da partida
 						printf("Partida finalizada na sala %u - Vencedor: Jogador %d\n",
 						       sala->id, sala->jogo.vencedor_partida);
+						printf("Sala %u destruída\n", sala->id);
 					}
 				}
 
@@ -421,6 +469,19 @@ void processar_mensagem(Cliente* cliente, Mensagem* msg) {
 				memcpy(resposta.dados, &estado2, sizeof(EstadoJogo));
 				enviar_mensagem(sala->jogador2_socket, &resposta);
 
+				// Verifica se a partida terminou
+				if (sala->jogo.partida_finalizada) {
+					Mensagem fim;
+					memset(&fim, 0, sizeof(Mensagem));
+					fim.tipo = MSG_FIM_PARTIDA;
+					fim.sala_id = sala->id;
+					memcpy(fim.dados, &sala->jogo.vencedor_partida, sizeof(int));
+					broadcast_sala(sala, &fim, -1);
+					sala->em_partida = false;
+					printf("Partida finalizada na sala %u - Vencedor: Jogador %d\n",
+					       sala->id, sala->jogo.vencedor_partida);
+				}
+
 				pthread_mutex_unlock(&sala->mutex);
 			}
 			break;
@@ -490,6 +551,19 @@ void processar_mensagem(Cliente* cliente, Mensagem* msg) {
 				resposta.jogador_id = sala->jogador2_id;
 				memcpy(resposta.dados, &estado2, sizeof(EstadoJogo));
 				enviar_mensagem(sala->jogador2_socket, &resposta);
+
+				// Verifica se a partida terminou
+				if (sala->jogo.partida_finalizada) {
+					Mensagem fim;
+					memset(&fim, 0, sizeof(Mensagem));
+					fim.tipo = MSG_FIM_PARTIDA;
+					fim.sala_id = sala->id;
+					memcpy(fim.dados, &sala->jogo.vencedor_partida, sizeof(int));
+					broadcast_sala(sala, &fim, -1);
+					sala->em_partida = false;
+					printf("Partida finalizada na sala %u - Vencedor: Jogador %d\n",
+					       sala->id, sala->jogo.vencedor_partida);
+				}
 
 				pthread_mutex_unlock(&sala->mutex);
 			}
