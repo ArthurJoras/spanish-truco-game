@@ -518,15 +518,15 @@ void ui_renderizar_jogo(UIGrafica* ui, UIEstado* estado) {
 	for (int rodada = 0; rodada < 3; rodada++) {
 		int x = inicio_x + rodada * rodada_spacing;
 
-		// Carta do jogador 1 (em cima)
-		if (estado->estado_jogo.cartas_jogadas_rodada[rodada * 2].numero != 0) {
-			ui_desenhar_carta(ui, estado->estado_jogo.cartas_jogadas_rodada[rodada * 2],
+		// Carta do oponente (em cima, perto das cartas de verso)
+		if (estado->estado_jogo.cartas_jogadas_rodada[rodada * 2 + 1].numero != 0) {
+			ui_desenhar_carta(ui, estado->estado_jogo.cartas_jogadas_rodada[rodada * 2 + 1],
 			                  x, mesa_y, false, false);
 		}
 
-		// Carta do jogador 2 (embaixo)
-		if (estado->estado_jogo.cartas_jogadas_rodada[rodada * 2 + 1].numero != 0) {
-			ui_desenhar_carta(ui, estado->estado_jogo.cartas_jogadas_rodada[rodada * 2 + 1],
+		// Sua carta (embaixo, perto da sua mão)
+		if (estado->estado_jogo.cartas_jogadas_rodada[rodada * 2].numero != 0) {
+			ui_desenhar_carta(ui, estado->estado_jogo.cartas_jogadas_rodada[rodada * 2],
 			                  x, mesa_y + 80, false, false);  // 80px abaixo
 		}
 	}  // Suas cartas

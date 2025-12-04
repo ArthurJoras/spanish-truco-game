@@ -27,6 +27,37 @@ typedef struct {
 
 static ClienteGrafico cliente;
 
+// Funções auxiliares de rede - envio/recebimento completo
+static bool send_all(int socket, const void* buffer, size_t length) {
+	const char* ptr = (const char*)buffer;
+	size_t remaining = length;
+
+	while (remaining > 0) {
+		ssize_t sent = send(socket, ptr, remaining, 0);
+		if (sent <= 0) {
+			return false;
+		}
+		ptr += sent;
+		remaining -= sent;
+	}
+	return true;
+}
+
+static bool recv_all(int socket, void* buffer, size_t length) {
+	char* ptr = (char*)buffer;
+	size_t remaining = length;
+
+	while (remaining > 0) {
+		ssize_t received = recv(socket, ptr, remaining, 0);
+		if (received <= 0) {
+			return false;
+		}
+		ptr += received;
+		remaining -= received;
+	}
+	return true;
+}
+
 // Protótipos de funções
 bool conectar_servidor(const char* ip, int porta);
 void desconectar_servidor();
@@ -124,8 +155,7 @@ bool enviar_mensagem(Mensagem* msg) {
 	msg->jogador_id = cliente.id;
 	msg->sala_id = cliente.estado.sala_id;
 
-	int bytes = send(cliente.socket, msg, sizeof(Mensagem), 0);
-	return bytes == sizeof(Mensagem);
+	return send_all(cliente.socket, msg, sizeof(Mensagem));
 }
 
 void processar_mensagem_recebida(Mensagem* msg) {
@@ -264,11 +294,11 @@ void* thread_receber_mensagens(void* arg) {
 	const int DELAY_BASE = 2;
 
 	while (cliente.conectado) {
-		int bytes = recv(cliente.socket, &msg, sizeof(Mensagem), 0);
+		bool recebeu = recv_all(cliente.socket, &msg, sizeof(Mensagem));
 
-		if (bytes == sizeof(Mensagem)) {
+		if (recebeu) {
 			processar_mensagem_recebida(&msg);
-		} else if (bytes == 0 || bytes < 0) {
+		} else {
 			printf("Conexão perdida com o servidor\n");
 			close(cliente.socket);
 

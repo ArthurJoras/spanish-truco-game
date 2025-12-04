@@ -244,16 +244,33 @@ void resolver_rodada(Jogo* jogo) {
 	if (jogo->rodada_atual >= 3) {
 		finalizar_mao(jogo);
 	} else {
-		// Verifica se já tem vencedor (melhor de 3)
-		int vitorias_j1 = 0, vitorias_j2 = 0;
+		// Verifica se já tem vencedor antes de 3 rodadas
+		// Regras do truco espanhol:
+		// - 2 vitórias = ganha
+		// - Empate na 1ª + vitória na 2ª = quem ganhou a 2ª ganha a mão
+		// - Vitória na 1ª + empate na 2ª = quem ganhou a 1ª ganha a mão
+		int vitorias_j1 = 0, vitorias_j2 = 0, empates = 0;
 		for (int i = 0; i < jogo->rodada_atual; i++) {
 			if (jogo->rodadas[i].vencedor == 1)
 				vitorias_j1++;
 			else if (jogo->rodadas[i].vencedor == 2)
 				vitorias_j2++;
+			else
+				empates++;
 		}
 
+		// Condições de finalização antes de 3 rodadas:
+		// 1) Alguém tem 2 vitórias
+		// 2) Após 2 rodadas: 1 vitória + 1 empate (quem venceu ganha a mão)
+		bool finalizar = false;
 		if (vitorias_j1 >= 2 || vitorias_j2 >= 2) {
+			finalizar = true;
+		} else if (jogo->rodada_atual == 2 && empates == 1 && (vitorias_j1 == 1 || vitorias_j2 == 1)) {
+			// Uma vitória e um empate após 2 rodadas = mão decidida
+			finalizar = true;
+		}
+
+		if (finalizar) {
 			finalizar_mao(jogo);
 		}
 	}
@@ -595,14 +612,26 @@ EstadoJogo obter_estado_jogo(Jogo* jogo, int jogador) {
 	memset(estado.cartas_jogadas_rodada, 0, sizeof(estado.cartas_jogadas_rodada));
 
 	// Preenche cartas de todas as rodadas já jogadas
+	// Para cada jogador, índice par = sua carta, índice ímpar = carta do oponente
 	for (int r = 0; r < 3; r++) {
 		Rodada* rodada = &jogo->rodadas[r];
 		// Índices: rodada 0 -> [0,1], rodada 1 -> [2,3], rodada 2 -> [4,5]
-		if (rodada->jogador1_jogou) {
-			estado.cartas_jogadas_rodada[r * 2] = rodada->carta_jogador1;
-		}
-		if (rodada->jogador2_jogou) {
-			estado.cartas_jogadas_rodada[r * 2 + 1] = rodada->carta_jogador2;
+		// Índice par = carta do jogador que está vendo, ímpar = carta do oponente
+		if (jogador == 1) {
+			if (rodada->jogador1_jogou) {
+				estado.cartas_jogadas_rodada[r * 2] = rodada->carta_jogador1;
+			}
+			if (rodada->jogador2_jogou) {
+				estado.cartas_jogadas_rodada[r * 2 + 1] = rodada->carta_jogador2;
+			}
+		} else {
+			// Para jogador 2, inverte: sua carta no índice par, oponente no ímpar
+			if (rodada->jogador2_jogou) {
+				estado.cartas_jogadas_rodada[r * 2] = rodada->carta_jogador2;
+			}
+			if (rodada->jogador1_jogou) {
+				estado.cartas_jogadas_rodada[r * 2 + 1] = rodada->carta_jogador1;
+			}
 		}
 	}
 

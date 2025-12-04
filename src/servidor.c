@@ -177,13 +177,44 @@ void remover_cliente_da_sala(Cliente* cliente) {
 	cliente->sala_id = 0;
 }
 
+// Envia todos os bytes garantindo entrega completa
+bool send_all(int socket, const void* buffer, size_t length) {
+	const char* ptr = (const char*)buffer;
+	size_t remaining = length;
+
+	while (remaining > 0) {
+		ssize_t sent = send(socket, ptr, remaining, 0);
+		if (sent <= 0) {
+			return false;  // Erro ou conexão fechada
+		}
+		ptr += sent;
+		remaining -= sent;
+	}
+	return true;
+}
+
+// Recebe todos os bytes garantindo leitura completa
+bool recv_all(int socket, void* buffer, size_t length) {
+	char* ptr = (char*)buffer;
+	size_t remaining = length;
+
+	while (remaining > 0) {
+		ssize_t received = recv(socket, ptr, remaining, 0);
+		if (received <= 0) {
+			return false;  // Erro ou conexão fechada
+		}
+		ptr += received;
+		remaining -= received;
+	}
+	return true;
+}
+
 void enviar_mensagem(int socket, Mensagem* msg) {
-	send(socket, msg, sizeof(Mensagem), 0);
+	send_all(socket, msg, sizeof(Mensagem));
 }
 
 bool receber_mensagem(int socket, Mensagem* msg) {
-	int bytes = recv(socket, msg, sizeof(Mensagem), 0);
-	return bytes == sizeof(Mensagem);
+	return recv_all(socket, msg, sizeof(Mensagem));
 }
 
 void broadcast_sala(Sala* sala, Mensagem* msg, int exceto_socket) {
