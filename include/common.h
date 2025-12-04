@@ -122,7 +122,6 @@ typedef struct {
 #define MAX_CLIENTES 100
 #define MAX_SALAS 50
 #define PONTOS_VITORIA 15
-#define CARTAS_POR_JOGADOR 3
 
 // Funções auxiliares
 const char* naipe_para_string(Naipe naipe);

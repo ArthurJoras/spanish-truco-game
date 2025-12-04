@@ -382,9 +382,10 @@ void processar_mensagem(Cliente* cliente, Mensagem* msg) {
 						memset(&fim, 0, sizeof(Mensagem));
 						fim.tipo = MSG_FIM_PARTIDA;
 						fim.sala_id = sala->id;
-						memcpy(fim.dados, &sala->jogo.vencedor_partida, sizeof(int));
+						// Envia ID do cliente vencedor (não o número do jogador)
+						uint32_t id_vencedor = (sala->jogo.vencedor_partida == 1) ? sala->jogador1_id : sala->jogador2_id;
+						memcpy(fim.dados, &id_vencedor, sizeof(uint32_t));
 						broadcast_sala(sala, &fim, -1);
-
 						sala->em_partida = false;
 						sala->ativa = false;  // Destrói a sala após fim da partida
 						printf("Partida finalizada na sala %u - Vencedor: Jogador %d\n",
@@ -462,7 +463,9 @@ void processar_mensagem(Cliente* cliente, Mensagem* msg) {
 					memset(&fim, 0, sizeof(Mensagem));
 					fim.tipo = MSG_FIM_PARTIDA;
 					fim.sala_id = sala->id;
-					memcpy(fim.dados, &sala->jogo.vencedor_partida, sizeof(int));
+					// Envia ID do cliente vencedor (não o número do jogador)
+					uint32_t id_vencedor = (sala->jogo.vencedor_partida == 1) ? sala->jogador1_id : sala->jogador2_id;
+					memcpy(fim.dados, &id_vencedor, sizeof(uint32_t));
 					broadcast_sala(sala, &fim, -1);
 					sala->em_partida = false;
 					printf("Partida finalizada na sala %u - Vencedor: Jogador %d\n",
@@ -539,7 +542,9 @@ void processar_mensagem(Cliente* cliente, Mensagem* msg) {
 					memset(&fim, 0, sizeof(Mensagem));
 					fim.tipo = MSG_FIM_PARTIDA;
 					fim.sala_id = sala->id;
-					memcpy(fim.dados, &sala->jogo.vencedor_partida, sizeof(int));
+					// Envia ID do cliente vencedor (não o número do jogador)
+					uint32_t id_vencedor = (sala->jogo.vencedor_partida == 1) ? sala->jogador1_id : sala->jogador2_id;
+					memcpy(fim.dados, &id_vencedor, sizeof(uint32_t));
 					broadcast_sala(sala, &fim, -1);
 					sala->em_partida = false;
 					printf("Partida finalizada na sala %u - Vencedor: Jogador %d\n",

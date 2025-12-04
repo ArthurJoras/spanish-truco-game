@@ -198,8 +198,11 @@ void processar_mensagem_recebida(Mensagem* msg) {
 			cliente.estado.tela_atual = TELA_JOGO;
 			cliente.estado.precisa_reconfigurar_botoes = true;
 			break;
+		case MSG_TRUCO:
 			printf("TRUCO cantado!\n");
 			cliente.estado.tipo_canto_aguardando = MSG_TRUCO;
+			cliente.estado.aguardando_resposta_canto = true;
+			cliente.estado.precisa_reconfigurar_botoes = true;
 			snprintf(cliente.estado.mensagem_temporaria, sizeof(cliente.estado.mensagem_temporaria),
 			         "TRUCO! Responda!");
 			cliente.estado.tempo_mensagem = 5.0f;
@@ -207,6 +210,8 @@ void processar_mensagem_recebida(Mensagem* msg) {
 		case MSG_ENVIDO:
 			printf("ENVIDO cantado!\n");
 			cliente.estado.tipo_canto_aguardando = MSG_ENVIDO;
+			cliente.estado.aguardando_resposta_canto = true;
+			cliente.estado.precisa_reconfigurar_botoes = true;
 			snprintf(cliente.estado.mensagem_temporaria, sizeof(cliente.estado.mensagem_temporaria),
 			         "ENVIDO! Responda!");
 			cliente.estado.tempo_mensagem = 5.0f;
@@ -214,17 +219,19 @@ void processar_mensagem_recebida(Mensagem* msg) {
 		case MSG_FLOR:
 			printf("FLOR cantada!\n");
 			cliente.estado.tipo_canto_aguardando = MSG_FLOR;
+			cliente.estado.aguardando_resposta_canto = true;
+			cliente.estado.precisa_reconfigurar_botoes = true;
 			snprintf(cliente.estado.mensagem_temporaria, sizeof(cliente.estado.mensagem_temporaria),
 			         "FLOR! Responda!");
 			cliente.estado.tempo_mensagem = 5.0f;
 			break;
 		case MSG_FIM_PARTIDA: {
-			int vencedor;
-			memcpy(&vencedor, msg->dados, sizeof(int));
+			uint32_t vencedor;
+			memcpy(&vencedor, msg->dados, sizeof(uint32_t));
 			cliente.estado.vencedor_partida = vencedor;
 			cliente.estado.tela_atual = TELA_FIM_PARTIDA;
 			cliente.estado.em_partida = false;
-			printf("Partida finalizada! Vencedor: %d\n", vencedor);
+			printf("Partida finalizada! Vencedor ID: %u (meu ID: %u)\n", vencedor, cliente.estado.meu_id);
 			break;
 		}
 
